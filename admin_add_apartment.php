@@ -3,86 +3,73 @@ session_start();
 require_once('database/db.php');
 
 if (!isset($_SESSION['OwnerID'])) {
-  header("Location: login.php");
-  exit();
+    header("Location: login.php");
+    exit();
 }
 
 include('header.php');
 ?>
-<link rel="stylesheet" href="!style.css">
+<link rel="stylesheet" href="style.css"> <!-- removed ! -->
 <?php
 // Handle form submission
 if (isset($_POST['add_apartment'])) {
-  $ownerID = $_SESSION['OwnerID'];
-  $building = $_POST['building_name'];
-  $unit = $_POST['unit_number'];
-  $rent = $_POST['rent_amount'];
-  $bedrooms = $_POST['bedrooms'];
-  $bathrooms = $_POST['bathrooms'];
-  $province = $_POST['province'];
-  $city = $_POST['city'];
-  $barangay = $_POST['barangay'];
-  $street = $_POST['street'];
-  $available = 1; // Default to available
+    $ownerID   = $_SESSION['OwnerID'];
+    $building  = $_POST['building_name'];
+    $unit      = $_POST['unit_number'];
+    $rent      = $_POST['rent_amount'];
+    $bedrooms  = $_POST['bedrooms'];
+    $bathrooms = $_POST['bathrooms'];
+    $province  = $_POST['province'];
+    $city      = $_POST['city'];
+    $barangay  = $_POST['barangay'];
+    $street    = $_POST['street'];
 
-  try {
-    $stmt = $pdo->prepare("INSERT INTO Apartments (
-            OwnerID, BuildingName, RentAmount, Bedrooms, Bathrooms, Available,
-            UnitNumber, Apt_Prov, Apt_City, Apt_Brgy, Apt_Street
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    try {
+        // Use db.php function
+        addApartment($pdo, $ownerID, $building, $unit, $rent, $bedrooms, $bathrooms, $province, $city, $barangay, $street);
 
-    $stmt->execute([
-      $ownerID,
-      $building,
-      $rent,
-      $bedrooms,
-      $bathrooms,
-      $available,
-      $unit,
-      $province,
-      $city,
-      $barangay,
-      $street
-    ]);
-
-    echo "<script src='https://cdn.jsdelivr.net/npm/sweetalert2@11'></script>";
-    echo "<script>
-            Swal.fire({
-                icon: 'success',
-                title: 'Apartment Added',
-                text: 'The apartment has been successfully added.'
-            }).then(() => {
-                window.location.href = 'admin_dashboard.php';
-            });
-        </script>";
-  } catch (PDOException $e) {
-    echo "<script>
-            Swal.fire({
-                icon: 'error',
-                title: 'Database Error',
-                text: '" . addslashes($e->getMessage()) . "'
-            });
-        </script>";
-  }
+        echo "<script src='https://cdn.jsdelivr.net/npm/sweetalert2@11'></script>";
+        echo "<script>
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Apartment Added',
+                    text: 'The apartment has been successfully added.'
+                }).then(() => {
+                    window.location.href = 'admin_dashboard.php';
+                });
+              </script>";
+    } catch (PDOException $e) {
+        echo "<script src='https://cdn.jsdelivr.net/npm/sweetalert2@11'></script>";
+        echo "<script>
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Database Error',
+                    text: '" . addslashes($e->getMessage()) . "'
+                });
+              </script>";
+    }
 }
 ?>
 
 <div class="container mt-5">
-  <h2>Add New Apartment</h2>
-  <form method="POST" class="mt-4">
-    <input type="text" name="building_name" class="form-control mb-2" placeholder="Building Name" required>
-    <input type="text" name="unit_number" class="form-control mb-2" placeholder="Unit Number" required>
-    <input type="number" name="rent_amount" class="form-control mb-2" placeholder="Monthly Rent (PHP)" required>
-    <input type="number" name="bedrooms" class="form-control mb-2" placeholder="Bedrooms" required>
-    <input type="number" name="bathrooms" class="form-control mb-2" placeholder="Bathrooms" required>
-    <input type="text" name="province" class="form-control mb-2" placeholder="Province" required>
-    <input type="text" name="city" class="form-control mb-2" placeholder="City" required>
-    <input type="text" name="barangay" class="form-control mb-2" placeholder="Barangay" required>
-    <input type="text" name="street" class="form-control mb-3" placeholder="Street" required>
-    <button type="submit" name="add_apartment" class="btn btn-primary">Add Apartment</button>
-    <a href="admin_dashboard.php" class="btn btn-secondary">← Back</a>
-  </form>
+    <h2>Add New Apartment</h2>
+    <form method="POST" class="mt-4">
+        <input type="text" name="building_name" class="form-control mb-2" placeholder="Building Name" required>
+        <input type="text" name="unit_number" class="form-control mb-2" placeholder="Unit Number" required>
+        <input type="number" name="rent_amount" class="form-control mb-2" placeholder="Monthly Rent (PHP)" required>
+        <input type="number" name="bedrooms" class="form-control mb-2" placeholder="Bedrooms" required>
+        <input type="number" name="bathrooms" class="form-control mb-2" placeholder="Bathrooms" required>
+        <input type="text" name="province" class="form-control mb-2" placeholder="Province" required>
+        <input type="text" name="city" class="form-control mb-2" placeholder="City" required>
+        <input type="text" name="barangay" class="form-control mb-2" placeholder="Barangay" required>
+        <input type="text" name="street" class="form-control mb-3" placeholder="Street" required>
+        <button type="submit" name="add_apartment" class="btn btn-primary">Add Apartment</button>
+        <a href="admin_dashboard.php" class="btn btn-secondary">← Back</a>
+    </form>
 </div>
+
+<?php include('footer.php'); ?>
+
 
 <style>
   /* Modern Background */

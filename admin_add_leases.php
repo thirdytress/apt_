@@ -2,40 +2,40 @@
 session_start();
 require_once('database/db.php');
 include('header.php');
- 
+
 if (!isset($_SESSION['OwnerID'])) {
     header("Location: login.php");
     exit();
 }
- 
-// Get list of tenants
-$tenants = $pdo->query("SELECT * FROM Tenants")->fetchAll(PDO::FETCH_ASSOC);
- 
-// Get available apartments
-$apartments = $pdo->prepare("SELECT * FROM Apartments WHERE Available = 1 AND OwnerID = ?");
+
+// ✅ Get list of tenants
+$tenants = $pdo->query("SELECT * FROM tenants")->fetchAll(PDO::FETCH_ASSOC);
+
+// ✅ Get available apartments for the logged-in owner
+$apartments = $pdo->prepare("SELECT * FROM apartments WHERE Available = 1 AND OwnerID = ?");
 $apartments->execute([$_SESSION['OwnerID']]);
 $apartmentList = $apartments->fetchAll(PDO::FETCH_ASSOC);
- 
-// Handle form submission
+
+// ✅ Handle form submission
 if (isset($_POST['add_lease'])) {
-    $tenantID = $_POST['tenant_id'];
+    $tenantID   = $_POST['tenant_id'];
     $apartmentID = $_POST['apartment_id'];
-    $start = $_POST['start_date'];
-    $end = $_POST['end_date'];
-    $rent = $_POST['monthly_rent'];
-    $deposit = $_POST['deposit'];
- 
+    $start      = $_POST['start_date'];
+    $end        = $_POST['end_date'];
+    $rent       = $_POST['monthly_rent'];
+    $deposit    = $_POST['deposit'];
+
     try {
-        // Insert lease
-        $stmt = $pdo->prepare("INSERT INTO Leases
+        // ✅ Insert lease (matching DB columns)
+        $stmt = $pdo->prepare("INSERT INTO leases
             (ApartmentID, TenantID, StartDate, EndDate, MonthlyRent, DepositAmount, LeaseStatus)
             VALUES (?, ?, ?, ?, ?, ?, 'Active')");
         $stmt->execute([$apartmentID, $tenantID, $start, $end, $rent, $deposit]);
- 
-        // Mark apartment as occupied
-        $pdo->prepare("UPDATE Apartments SET Available = 0 WHERE ApartmentID = ?")
+
+        // ✅ Mark apartment as occupied
+        $pdo->prepare("UPDATE apartments SET Available = 0 WHERE ApartmentID = ?")
             ->execute([$apartmentID]);
- 
+
         echo "<script src='https://cdn.jsdelivr.net/npm/sweetalert2@11'></script>";
         echo "<script>
             Swal.fire({
@@ -47,6 +47,7 @@ if (isset($_POST['add_lease'])) {
             });
         </script>";
     } catch (PDOException $e) {
+        echo "<script src='https://cdn.jsdelivr.net/npm/sweetalert2@11'></script>";
         echo "<script>
             Swal.fire({
                 icon: 'error',
@@ -67,7 +68,7 @@ if (isset($_POST['add_lease'])) {
                 <option disabled selected value="">-- Select Tenant --</option>
                 <?php foreach ($tenants as $t): ?>
                     <option value="<?= $t['TenantID'] ?>">
-                        <?= $t['FirstName'] . ' ' . $t['LastName'] ?>
+                        <?= htmlspecialchars($t['FirstName'] . ' ' . $t['LastName']) ?>
                     </option>
                 <?php endforeach; ?>
             </select>
@@ -79,7 +80,7 @@ if (isset($_POST['add_lease'])) {
                 <option disabled selected value="">-- Select Apartment --</option>
                 <?php foreach ($apartmentList as $a): ?>
                     <option value="<?= $a['ApartmentID'] ?>">
-                        <?= $a['BuildingName'] ?> - Unit <?= $a['UnitNumber'] ?>
+                        <?= htmlspecialchars($a['BuildingName'] . ' - Unit ' . $a['UnitNumber']) ?>
                     </option>
                 <?php endforeach; ?>
             </select>
@@ -94,6 +95,9 @@ if (isset($_POST['add_lease'])) {
         <a href="admin_dashboard.php" class="btn btn-secondary">← Back</a>
     </form>
 </div>
+
+<?php include('footer.php'); ?>
+
  <style>
   /* Modern Background */
   body {

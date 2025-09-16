@@ -1,113 +1,60 @@
 <?php
 session_start();
 require_once('database/db.php');
- 
+
 if (!isset($_SESSION['OwnerID'])) {
     header("Location: login.php");
     exit();
 }
- 
+
 $ownerID = $_SESSION['OwnerID'];
- 
-// ✅ Handle Form Submission and redirect
+
+// ✅ Handle Form Submission
 if (isset($_POST['add_availability'])) {
     $apartmentID = $_POST['apartment_id'];
-    $startDate = $_POST['start_date'];
-    $endDate = $_POST['end_date'];
-    $status = $_POST['status'];
- 
-    $stmt = $pdo->prepare("INSERT INTO ApartmentAvailability (ApartmentID, Start_Date, End_Date, Status) VALUES (?, ?, ?, ?)");
-    $stmt->execute([$apartmentID, $startDate, $endDate, $status]);
- 
-    // ✅ Redirect to admin dashboard
-    header("Location: admin_dashboard.php");
-    exit();
+    $startDate   = $_POST['start_date'];
+    $endDate     = $_POST['end_date'];
+    $status      = $_POST['status'];
+
+    try {
+        // use correct lowercase table name
+        $stmt = $pdo->prepare("INSERT INTO apartmentavailability 
+            (ApartmentID, Start_Date, End_Date, Status) VALUES (?, ?, ?, ?)");
+        $stmt->execute([$apartmentID, $startDate, $endDate, $status]);
+
+        header("Location: admin_dashboard.php");
+        exit();
+    } catch (PDOException $e) {
+        echo "<script src='https://cdn.jsdelivr.net/npm/sweetalert2@11'></script>";
+        echo "<script>
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Database Error',
+                    text: '" . addslashes($e->getMessage()) . "'
+                });
+              </script>";
+    }
 }
- 
-// ✅ Get Apartments Owned by Admin
-$stmt = $pdo->prepare("SELECT * FROM Apartments WHERE OwnerID = ?");
+
+// ✅ Get Apartments Owned by Owner
+$stmt = $pdo->prepare("SELECT * FROM apartments WHERE OwnerID = ?");
 $stmt->execute([$ownerID]);
 $apartments = $stmt->fetchAll(PDO::FETCH_ASSOC);
- 
+
 // ✅ Get Current Availability
 $availStmt = $pdo->prepare("
     SELECT AA.*, A.BuildingName, A.UnitNumber
-    FROM ApartmentAvailability AA
-    JOIN Apartments A ON AA.ApartmentID = A.ApartmentID
+    FROM apartmentavailability AA
+    JOIN apartments A ON AA.ApartmentID = A.ApartmentID
     WHERE A.OwnerID = ?
-    ORDER BY Start_Date DESC
+    ORDER BY AA.Start_Date DESC
 ");
 $availStmt->execute([$ownerID]);
 $availability = $availStmt->fetchAll(PDO::FETCH_ASSOC);
+
+include('header.php');
 ?>
- 
-<?php include('header.php'); ?>
- 
-<div class="container mt-5">
-    <h3>🗓 Apartment Availability</h3>
- 
-    <!-- 🔘 Add Availability Form -->
-    <form method="POST" class="mb-4">
-        <div class="row">
-            <div class="col-md-3">
-                <label>Select Apartment</label>
-                <select name="apartment_id" class="form-control" required>
-                    <?php foreach ($apartments as $apt): ?>
-                        <option value="<?= $apt['ApartmentID'] ?>">
-                            <?= $apt['BuildingName'] ?> - Unit <?= $apt['UnitNumber'] ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div class="col-md-3">
-                <label>Start Date</label>
-                <input type="date" name="start_date" class="form-control" required>
-            </div>
-            <div class="col-md-3">
-                <label>End Date</label>
-                <input type="date" name="end_date" class="form-control" required>
-            </div>
-            <div class="col-md-2">
-                <label>Status</label>
-                <select name="status" class="form-control">
-                    <option value="Available">Available</option>
-                    <option value="Reserved">Reserved</option>
-                </select>
-            </div>
-            <div class="col-md-1 d-flex align-items-end">
-                <button type="submit" name="add_availability" class="btn btn-success">Add</button>
-            </div>
-        </div>
-    </form>
- 
-    <!-- 📋 Availability Table -->
-    <table class="table table-bordered">
-        <thead class="table-light">
-            <tr>
-                <th>Apartment</th>
-                <th>Start</th>
-                <th>End</th>
-                <th>Status</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php foreach ($availability as $row): ?>
-            <tr>
-                <td><?= $row['BuildingName'] ?> - Unit <?= $row['UnitNumber'] ?></td>
-                <td><?= $row['Start_Date'] ?></td>
-                <td><?= $row['End_Date'] ?></td>
-                <td><?= $row['Status'] ?></td>
-            </tr>
-            <?php endforeach; ?>
-        </tbody>
-    </table>
- 
-    <!-- 🔙 Back to Dashboard -->
-    <div class="mt-4">
-        <a href="admin_dashboard.php" class="btn btn-secondary">← Back to Dashboard</a>
-    </div>
- 
-</div>
+
  
 <style>
 /* Base Styles */
