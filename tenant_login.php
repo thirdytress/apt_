@@ -5,23 +5,23 @@ require_once('database/db.php');
 $error = "";
 
 if (isset($_POST['login'])) {
-    $email = $_POST['email'];
-    $password = $_POST['password'];
+    $email = $_POST['email'] ?? '';
+    $password = $_POST['password'] ?? '';
 
-    // Fetch tenant by email
-    $stmt = $pdo->prepare("SELECT * FROM Tenants WHERE Email = ?");
+    // ✅ Fetch tenant by email
+    $stmt = $pdo->prepare("SELECT * FROM tenants WHERE tenant_email = ?");
     $stmt->execute([$email]);
     $tenant = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if ($tenant && password_verify($password, $tenant['Password'])) {
-        $_SESSION['TenantID'] = $tenant['TenantID'];
-        $_SESSION['TenantName'] = $tenant['FirstName'] . ' ' . $tenant['LastName'];
+    if ($tenant && password_verify($password, $tenant['tenant_pass'])) {
+        $_SESSION['TenantID']   = $tenant['TenantID'];
+        $_SESSION['TenantName'] = $tenant['tenant_FN'] . ' ' . $tenant['tenant_LN'];
 
         // ✅ Redirect BEFORE output
         header("Location: tenant_dashboard.php");
         exit();
     } else {
-        $error = "Invalid email or password.";
+        $error = "⚠️ Invalid email or password.";
     }
 }
 ?>
@@ -68,47 +68,24 @@ if (isset($_POST['login'])) {
       max-width: 420px;
       animation: fadeInUp 0.7s ease-out;
     }
-    .login-header {
-      text-align: center;
-      margin-bottom: 2rem;
-    }
+    .login-header { text-align: center; margin-bottom: 2rem; }
     .login-icon {
-      width: 80px;
-      height: 80px;
+      width: 80px; height: 80px;
       background: linear-gradient(135deg,#4f46e5,#3b82f6);
       border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 2rem;
-      color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2rem; color: #fff;
       margin: 0 auto 1rem;
       box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     }
-    .login-title {
-      font-size: 1.7rem;
-      font-weight: 700;
-      color: #1f2937;
-    }
-    .login-subtitle {
-      font-size: 0.95rem;
-      color: #6b7280;
-    }
-    .form-group {
-      margin-bottom: 1.3rem;
-    }
-    .form-label {
-      font-weight: 500;
-      color: #374151;
-      margin-bottom: 0.5rem;
-    }
+    .login-title { font-size: 1.7rem; font-weight: 700; color: #1f2937; }
+    .login-subtitle { font-size: 0.95rem; color: #6b7280; }
+    .form-group { margin-bottom: 1.3rem; }
+    .form-label { font-weight: 500; color: #374151; margin-bottom: 0.5rem; }
     .form-input {
-      width: 100%;
-      padding: 0.9rem 1rem;
-      border: 1.8px solid #e5e7eb;
-      border-radius: 10px;
-      transition: all 0.3s ease;
-      font-size: 1rem;
+      width: 100%; padding: 0.9rem 1rem;
+      border: 1.8px solid #e5e7eb; border-radius: 10px;
+      transition: all 0.3s ease; font-size: 1rem;
     }
     .form-input:focus {
       border-color: #3b82f6;
@@ -116,51 +93,20 @@ if (isset($_POST['login'])) {
       outline: none;
     }
     .btn-login {
-      width: 100%;
-      padding: 0.9rem;
+      width: 100%; padding: 0.9rem;
       background: linear-gradient(135deg,#3b82f6,#2563eb);
-      border: none;
-      border-radius: 10px;
-      color: #fff;
-      font-weight: 600;
-      font-size: 1rem;
-      cursor: pointer;
-      transition: all 0.3s ease;
+      border: none; border-radius: 10px;
+      color: #fff; font-weight: 600; font-size: 1rem;
+      cursor: pointer; transition: all 0.3s ease;
       margin-top: 0.5rem;
     }
-    .btn-login:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 16px rgba(59,130,246,0.35);
-    }
-    .alert {
-      border-radius: 10px;
-      padding: 0.9rem 1rem;
-      font-size: 0.9rem;
-      margin-bottom: 1rem;
-    }
-    .alert-danger {
-      background: #fee2e2;
-      color: #b91c1c;
-      border-left: 4px solid #ef4444;
-    }
-    .login-footer {
-      margin-top: 1.5rem;
-      text-align: center;
-      font-size: 0.9rem;
-      color: #6b7280;
-    }
-    .login-footer a {
-      color: #2563eb;
-      font-weight: 600;
-      text-decoration: none;
-    }
-    .login-footer a:hover {
-      text-decoration: underline;
-    }
-    @keyframes fadeInUp {
-      from { opacity: 0; transform: translateY(25px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
+    .btn-login:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(59,130,246,0.35); }
+    .alert { border-radius: 10px; padding: 0.9rem 1rem; font-size: 0.9rem; margin-bottom: 1rem; }
+    .alert-danger { background: #fee2e2; color: #b91c1c; border-left: 4px solid #ef4444; }
+    .login-footer { margin-top: 1.5rem; text-align: center; font-size: 0.9rem; color: #6b7280; }
+    .login-footer a { color: #2563eb; font-weight: 600; text-decoration: none; }
+    .login-footer a:hover { text-decoration: underline; }
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(25px); } to { opacity: 1; transform: translateY(0); } }
   </style>
 </head>
 <body>
@@ -175,7 +121,7 @@ if (isset($_POST['login'])) {
       </div>
 
       <?php if ($error): ?>
-        <div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> <?= $error ?></div>
+        <div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> <?= htmlspecialchars($error) ?></div>
       <?php endif; ?>
 
       <form method="POST">

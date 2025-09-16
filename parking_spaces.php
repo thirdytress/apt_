@@ -11,11 +11,11 @@ $ownerID = $_SESSION['OwnerID'];
 $success = "";
 
 // ✅ Assign Parking to Tenant
-if (isset($_POST['assign_parking']) && isset($_POST['parking_id']) && isset($_POST['tenant_id'])) {
+if (isset($_POST['assign_parking'], $_POST['parking_id'], $_POST['tenant_id'])) {
     $spaceID = $_POST['parking_id'];
     $tenantID = $_POST['tenant_id'];
 
-    $stmt = $pdo->prepare("UPDATE ParkingSpaces SET AssignedTo = ?, Status = 'Occupied' WHERE ParkingID = ?");
+    $stmt = $pdo->prepare("UPDATE parkingspaces SET AssignedTo = ?, Status = 'Occupied' WHERE ParkingID = ?");
     $stmt->execute([$tenantID, $spaceID]);
 
     header("Location: parking_spaces.php");
@@ -23,10 +23,10 @@ if (isset($_POST['assign_parking']) && isset($_POST['parking_id']) && isset($_PO
 }
 
 // ✅ Unassign Parking Space
-if (isset($_POST['unassign_parking']) && isset($_POST['parking_id'])) {
+if (isset($_POST['unassign_parking'], $_POST['parking_id'])) {
     $spaceID = $_POST['parking_id'];
 
-    $stmt = $pdo->prepare("UPDATE ParkingSpaces SET AssignedTo = NULL, Status = 'Available' WHERE ParkingID = ?");
+    $stmt = $pdo->prepare("UPDATE parkingspaces SET AssignedTo = NULL, Status = 'Available' WHERE ParkingID = ?");
     $stmt->execute([$spaceID]);
 
     header("Location: parking_spaces.php");
@@ -39,30 +39,38 @@ if (isset($_POST['add_parking'])) {
     $spaceNumber = $_POST['space_number'];
     $status = $_POST['status'];
 
-    $stmt = $pdo->prepare("INSERT INTO ParkingSpaces (ApartmentID, SpaceNumber, Status) VALUES (?, ?, ?)");
+    $stmt = $pdo->prepare("INSERT INTO parkingspaces (ApartmentID, SpaceNumber, Status) VALUES (?, ?, ?)");
     $stmt->execute([$apartmentID, $spaceNumber, $status]);
-    $success = "New parking space added!";
+    $success = "✅ New parking space added!";
 }
 
-// Fetch Apartments and Tenants
-$apartments = $pdo->query("SELECT * FROM Apartments WHERE OwnerID = $ownerID")->fetchAll();
-$tenants = $pdo->query("
-    SELECT T.TenantID, T.FirstName, T.LastName
-    FROM Tenants T
-    JOIN Leases L ON T.TenantID = L.TenantID
-    JOIN Apartments A ON L.ApartmentID = A.ApartmentID
-    WHERE A.OwnerID = $ownerID
-")->fetchAll();
+// ✅ Fetch Apartments owned by logged-in owner
+$apartments = $pdo->prepare("SELECT * FROM apartments WHERE OwnerID = ?");
+$apartments->execute([$ownerID]);
+$apartments = $apartments->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch Parking Spaces
-$parkingSpaces = $pdo->query("
+// ✅ Fetch Tenants linked to this owner's apartments
+$tenants = $pdo->prepare("
+    SELECT T.TenantID, T.FirstName, T.LastName
+    FROM tenants T
+    JOIN leases L ON T.TenantID = L.TenantID
+    JOIN apartments A ON L.ApartmentID = A.ApartmentID
+    WHERE A.OwnerID = ?
+");
+$tenants->execute([$ownerID]);
+$tenants = $tenants->fetchAll(PDO::FETCH_ASSOC);
+
+// ✅ Fetch Parking Spaces with tenant info
+$parkingSpaces = $pdo->prepare("
     SELECT P.*, A.BuildingName, A.UnitNumber, T.FirstName, T.LastName
-    FROM ParkingSpaces P
-    JOIN Apartments A ON P.ApartmentID = A.ApartmentID
-    LEFT JOIN Tenants T ON P.AssignedTo = T.TenantID
-    WHERE A.OwnerID = $ownerID
+    FROM parkingspaces P
+    JOIN apartments A ON P.ApartmentID = A.ApartmentID
+    LEFT JOIN tenants T ON P.AssignedTo = T.TenantID
+    WHERE A.OwnerID = ?
     ORDER BY P.ParkingID DESC
-")->fetchAll();
+");
+$parkingSpaces->execute([$ownerID]);
+$parkingSpaces = $parkingSpaces->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
 <?php include('header.php'); ?>
@@ -80,7 +88,7 @@ $parkingSpaces = $pdo->query("
             <select name="apartment_id" class="form-control" required>
                 <?php foreach ($apartments as $apt): ?>
                     <option value="<?= $apt['ApartmentID'] ?>">
-                        <?= $apt['BuildingName'] ?> - Unit <?= $apt['UnitNumber'] ?>
+                        <?= htmlspecialchars($apt['BuildingName']) ?> - Unit <?= htmlspecialchars($apt['UnitNumber']) ?>
                     </option>
                 <?php endforeach; ?>
             </select>
@@ -115,15 +123,15 @@ $parkingSpaces = $pdo->query("
         <tbody>
             <?php foreach ($parkingSpaces as $space): ?>
                 <tr>
-                    <td><?= $space['BuildingName'] ?> - Unit <?= $space['UnitNumber'] ?></td>
-                    <td><?= $space['SpaceNumber'] ?></td>
+                    <td><?= htmlspecialchars($space['BuildingName']) ?> - Unit <?= htmlspecialchars($space['UnitNumber']) ?></td>
+                    <td><?= htmlspecialchars($space['SpaceNumber']) ?></td>
                     <td>
                         <?php if ($space['Status'] === 'Available'): ?>
                             <span class="badge bg-success">Available</span>
                         <?php else: ?>
                             <div>
                                 <span class="badge bg-secondary">
-                                    Assigned to <?= $space['FirstName'] . ' ' . $space['LastName'] ?>
+                                    Assigned to <?= htmlspecialchars($space['FirstName'] . ' ' . $space['LastName']) ?>
                                 </span>
                                 <form method="POST" class="mt-2">
                                     <input type="hidden" name="parking_id" value="<?= $space['ParkingID'] ?>">
@@ -141,7 +149,7 @@ $parkingSpaces = $pdo->query("
                                 <select name="tenant_id" class="form-select me-2" required>
                                     <?php foreach ($tenants as $tenant): ?>
                                         <option value="<?= $tenant['TenantID'] ?>">
-                                            <?= $tenant['FirstName'] . ' ' . $tenant['LastName'] ?>
+                                            <?= htmlspecialchars($tenant['FirstName'] . ' ' . $tenant['LastName']) ?>
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
@@ -158,6 +166,9 @@ $parkingSpaces = $pdo->query("
         </tbody>
     </table>
 </div>
+
+<?php include('footer.php'); ?>
+
 
 <style>
   /* Modern Background */

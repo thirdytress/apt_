@@ -1,17 +1,17 @@
-    <?php
+<?php
 session_start();
 require_once('database/db.php');
 include('header.php');
-require 'vendor/autoload.php'; // for PHPMailer
+require 'vendor/autoload.php'; // PHPMailer
 
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
 if (isset($_POST['register'])) {
-    $first = htmlspecialchars(trim($_POST['firstname']));
-    $last = htmlspecialchars(trim($_POST['lastname']));
-    $email = filter_var($_POST['email'], FILTER_SANITIZE_EMAIL);
-    $phone = htmlspecialchars(trim($_POST['phone']));
+    $first    = htmlspecialchars(trim($_POST['firstname']));
+    $last     = htmlspecialchars(trim($_POST['lastname']));
+    $email    = filter_var($_POST['email'], FILTER_SANITIZE_EMAIL);
+    $phone    = htmlspecialchars(trim($_POST['phone']));
     $username = htmlspecialchars(trim($_POST['username']));
     $password = $_POST['password'];
 
@@ -22,6 +22,7 @@ if (isset($_POST['register'])) {
         !preg_match('/[#@_]/', $password) ||      
         !preg_match('/[0-9]/', $password)         
     ) {
+        echo "<script src='https://cdn.jsdelivr.net/npm/sweetalert2@11'></script>";
         echo "<script>
             Swal.fire({
                 icon: 'error',
@@ -32,11 +33,12 @@ if (isset($_POST['register'])) {
         exit;
     }
 
-    // ✅ Check email duplicate
-    $check = $pdo->prepare("SELECT * FROM Owner WHERE Email = ?");
+    // ✅ Check email duplicate (fixed: `owners`)
+    $check = $pdo->prepare("SELECT * FROM owners WHERE Email = ?");
     $check->execute([$email]);
 
     if ($check->rowCount() > 0) {
+        echo "<script src='https://cdn.jsdelivr.net/npm/sweetalert2@11'></script>";
         echo "<script>
             Swal.fire({
                 icon: 'error',
@@ -48,29 +50,28 @@ if (isset($_POST['register'])) {
         // ✅ Generate verification code
         $verification_code = rand(100000, 999999);
 
-        // Save data in session temporarily
+        // Save data temporarily in session (insert after verification)
         $_SESSION['pending_user'] = [
             'firstname' => $first,
-            'lastname' => $last,
-            'email' => $email,
-            'phone' => $phone,
-            'username' => $username,
-            'password' => password_hash($password, PASSWORD_DEFAULT),
-            'code' => $verification_code
+            'lastname'  => $last,
+            'email'     => $email,
+            'phone'     => $phone,
+            'username'  => $username,
+            'password'  => password_hash($password, PASSWORD_DEFAULT),
+            'code'      => $verification_code
         ];
 
-        // ✅ Send email using PHPMailer
+        // ✅ Send email with PHPMailer
         $mail = new PHPMailer(true);
 
         try {
             $mail->isSMTP();
-$mail->Host       = 'smtp.gmail.com';
-$mail->SMTPAuth   = true;
-$mail->Username   = 'jgarvia9@gmail.com';  // your Gmail
-$mail->Password   = 'jtrdkbkwthstfkpa';   // <-- your 16-char App Password
-$mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-$mail->Port       = 587;
-
+            $mail->Host       = 'smtp.gmail.com';
+            $mail->SMTPAuth   = true;
+            $mail->Username   = 'jgarvia9@gmail.com';   // ✅ replace with your Gmail
+            $mail->Password   = 'jtrdkbkwthstfkpa';    // ✅ App Password (16 chars)
+            $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+            $mail->Port       = 587;
 
             $mail->setFrom('no-reply@apartmenthub.com', 'ApartmentHub Verification');
             $mail->addAddress($email);
@@ -81,6 +82,7 @@ $mail->Port       = 587;
 
             $mail->send();
 
+            echo "<script src='https://cdn.jsdelivr.net/npm/sweetalert2@11'></script>";
             echo "<script>
                 Swal.fire({
                     icon: 'info',

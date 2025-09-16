@@ -3,20 +3,23 @@ session_start();
 require_once('database/db.php'); 
 
 if (isset($_POST['login'])) {
-    $username = $_POST['username'];
+    $username = trim($_POST['username']);
     $password = $_POST['password'];
 
-    // Fetch user
-    $stmt = $pdo->prepare("SELECT * FROM Owner WHERE Owner_username = ?");
+    // ✅ Fetch user safely
+    $stmt = $pdo->prepare("SELECT * FROM owners WHERE Owner_username = ?");
     $stmt->execute([$username]);
     $owner = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if ($owner && password_verify($password, $owner['OwnerPass'])) {
-        $_SESSION['OwnerID'] = $owner['OwnerID'];
+        // ✅ Set session variables
+        $_SESSION['OwnerID']   = $owner['OwnerID'];
         $_SESSION['OwnerName'] = $owner['FirstName'];
+
         header("Location: admin_dashboard.php");
         exit();
     } else {
+        echo "<script src='https://cdn.jsdelivr.net/npm/sweetalert2@11'></script>";
         echo "<script>
                 Swal.fire({
                     icon: 'error',
@@ -29,7 +32,6 @@ if (isset($_POST['login'])) {
 ?>
 
 <?php include('header.php'); ?>
-
 
 <div class="container mt-5 col-md-4">
   <h3 class="text-center">Admin Login - ApartmentHub</h3>

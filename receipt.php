@@ -7,31 +7,36 @@ if (!isset($_SESSION['TenantID'])) {
     exit();
 }
 
-// Make sure the page receives POST data from the payment
-if (!isset($_POST['bill_id']) || !isset($_POST['payment_method'])) {
+// ✅ Ensure required POST data exists
+if (!isset($_POST['bill_id'], $_POST['payment_method'])) {
     die("No payment data available.");
 }
 
 $tenantID = $_SESSION['TenantID'];
-$billID = $_POST['bill_id'];
-$method = $_POST['payment_method'] ?? 'Unknown';
-$receiptFile = $_FILES['receipt']['name'] ?? null;
+$billID   = $_POST['bill_id'];
+$method   = $_POST['payment_method'] ?? 'Unknown';
 
 // Fetch tenant info
-$stmt = $pdo->prepare("SELECT * FROM Tenants WHERE TenantID = ?");
+$stmt = $pdo->prepare("SELECT * FROM tenants WHERE TenantID = ?");
 $stmt->execute([$tenantID]);
 $tenant = $stmt->fetch(PDO::FETCH_ASSOC);
 
 // Fetch bill info
-$stmt = $pdo->prepare("SELECT * FROM UtilityBills WHERE BillID = ? AND TenantID = ?");
+$stmt = $pdo->prepare("SELECT * FROM utilitybills WHERE BillID = ? AND TenantID = ?");
 $stmt->execute([$billID, $tenantID]);
 $bill = $stmt->fetch(PDO::FETCH_ASSOC);
 
-// Handle uploaded receipt
+if (!$bill) {
+    die("❌ Bill not found for this tenant.");
+}
+
+// ✅ Handle uploaded receipt
 $uploadedReceipt = null;
 if (isset($_FILES['receipt']) && $_FILES['receipt']['error'] === 0) {
     $targetDir = "uploads/";
-    if (!is_dir($targetDir)) mkdir($targetDir, 0777, true);
+    if (!is_dir($targetDir)) {
+        mkdir($targetDir, 0777, true);
+    }
     $fileName = time() . "_" . basename($_FILES["receipt"]["name"]);
     $targetFilePath = $targetDir . $fileName;
     if (move_uploaded_file($_FILES["receipt"]["tmp_name"], $targetFilePath)) {
@@ -39,13 +44,15 @@ if (isset($_FILES['receipt']) && $_FILES['receipt']['error'] === 0) {
     }
 }
 
-// Update bill status
-$pdo->prepare("UPDATE UtilityBills SET Status='Paid', PaymentMethod=? WHERE BillID=? AND TenantID=?")
-    ->execute([$method, $billID, $tenantID]);
+// ✅ Update bill status
+$pdo->prepare("UPDATE utilitybills SET Status = 'Paid' WHERE BillID = ? AND TenantID = ?")
+    ->execute([$billID, $tenantID]);
 
-// Insert into Payments
-$pdo->prepare("INSERT INTO Payments (TenantID, Amount, Pay_Method, Pay_Date, BillID, Receipt) VALUES (?, ?, ?, NOW(), ?, ?)")
-    ->execute([$tenantID, $bill['Amount'], $method, $billID, $uploadedReceipt]);
+// ✅ Insert into payments
+$pdo->prepare("
+    INSERT INTO payments (TenantID, Amount, Pay_Method, Status, Pay_Date, BillID, Receipt)
+    VALUES (?, ?, ?, 'Paid', NOW(), ?, ?)
+")->execute([$tenantID, $bill['Amount'], $method, $billID, $uploadedReceipt]);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -64,9 +71,9 @@ $pdo->prepare("INSERT INTO Payments (TenantID, Amount, Pay_Method, Pay_Date, Bil
     <h3 class="text-center text-primary">🏢 ApartmentHub</h3>
     <h5 class="text-center">Payment Receipt</h5>
     <hr>
-    <p><b>Tenant Name:</b> <?= htmlspecialchars($tenant['tenant_FN'] . ' ' . $tenant['tenant_LN']) ?></p>
-    <p><b>Email:</b> <?= htmlspecialchars($tenant['tenant_email']) ?></p>
-    <p><b>Phone:</b> <?= htmlspecialchars($tenant['tenant_phonenumber']) ?></p>
+    <p><b>Tenant Name:</b> <?= htmlspecialchars($tenant['FirstName'] . ' ' . $tenant['LastName']) ?></p>
+    <p><b>Email:</b> <?= htmlspecialchars($tenant['Email']) ?></p>
+    <p><b>Phone:</b> <?= htmlspecialchars($tenant['Phone']) ?></p>
     <hr>
     <p><b>Bill Type:</b> <?= htmlspecialchars($bill['Type']) ?></p>
     <p><b>Amount Paid:</b> ₱<?= number_format($bill['Amount'], 2) ?></p>

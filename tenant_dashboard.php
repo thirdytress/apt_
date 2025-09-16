@@ -1,7 +1,51 @@
 <?php
-// Keep your backend logic here (session, db, queries, etc.)
-include('header.php');
+session_start();
+require_once('database/db.php');
+
+// ✅ Ensure tenant is logged in
+if (!isset($_SESSION['TenantID'])) {
+    header("Location: tenant_login.php");
+    exit();
+}
+
+$tenantID = $_SESSION['TenantID'];
+
+// ✅ Fetch tenant info
+$stmt = $pdo->prepare("SELECT * FROM tenants WHERE TenantID = ?");
+$stmt->execute([$tenantID]);
+$tenant = $stmt->fetch(PDO::FETCH_ASSOC);
+
+// ✅ Page identifier for sidebar highlighting
+$page = $_GET['page'] ?? 'overview';
+
+// ✅ Fetch dashboard stats
+// Unread notifications
+$notifStmt = $pdo->prepare("SELECT COUNT(*) FROM tenantnotifications WHERE TenantID = ? AND IsRead = 0");
+$notifStmt->execute([$tenantID]);
+$unreadNotifications = $notifStmt->fetchColumn();
+
+// Unpaid bills
+$billStmt = $pdo->prepare("SELECT COUNT(*) FROM utilitybills WHERE TenantID = ? AND Status = 'Unpaid'");
+$billStmt->execute([$tenantID]);
+$unpaidBills = $billStmt->fetchColumn();
+
+// Last payment amount
+$paymentStmt = $pdo->prepare("SELECT Amount FROM payments WHERE TenantID = ? ORDER BY Pay_Date DESC LIMIT 1");
+$paymentStmt->execute([$tenantID]);
+$lastPayment = $paymentStmt->fetchColumn() ?: 0;
+
+// Parking info
+$parkStmt = $pdo->prepare("
+    SELECT P.SpaceNumber 
+    FROM parkingspaces P
+    WHERE P.AssignedTo = ?
+    LIMIT 1
+");
+$parkStmt->execute([$tenantID]);
+$parkingSlot = $parkStmt->fetchColumn() ?: "None";
 ?>
+
+<?php include('header.php'); ?>
 
 <!-- Bootstrap 5 -->
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -93,13 +137,13 @@ include('header.php');
         <h2>Welcome, <?= htmlspecialchars($tenant['FirstName'] ?? 'Tenant') ?> 👋</h2>
       </div>
 
-      <!-- Dashboard Cards Example -->
+      <!-- Dashboard Cards -->
       <div class="row g-4">
         <div class="col-md-3">
           <div class="card text-center">
             <div class="card-header bg-primary">🔔 Notifications</div>
             <div class="card-body">
-              <h4>5</h4>
+              <h4><?= $unreadNotifications ?></h4>
               <p>Unread messages</p>
             </div>
           </div>
@@ -109,7 +153,7 @@ include('header.php');
           <div class="card text-center">
             <div class="card-header bg-danger">💡 Unpaid Bills</div>
             <div class="card-body">
-              <h4>2</h4>
+              <h4><?= $unpaidBills ?></h4>
               <p>Pending bills</p>
             </div>
           </div>
@@ -119,7 +163,7 @@ include('header.php');
           <div class="card text-center">
             <div class="card-header bg-success">💳 Payments</div>
             <div class="card-body">
-              <h4>₱12,000</h4>
+              <h4>₱<?= number_format($lastPayment, 2) ?></h4>
               <p>Last payment</p>
             </div>
           </div>
@@ -129,13 +173,12 @@ include('header.php');
           <div class="card text-center">
             <div class="card-header bg-warning">🚗 Parking</div>
             <div class="card-body">
-              <h4>Slot A3</h4>
+              <h4><?= htmlspecialchars($parkingSlot) ?></h4>
               <p>Active Reservation</p>
             </div>
           </div>
         </div>
       </div>
-
     </main>
   </div>
 </div>

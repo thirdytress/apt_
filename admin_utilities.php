@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once('database/db.php');
+
 if (!isset($_SESSION['OwnerID'])) {
     header("Location: login.php");
     exit();
@@ -8,18 +9,21 @@ if (!isset($_SESSION['OwnerID'])) {
 
 $ownerID = $_SESSION['OwnerID'];
 $success = "";
-$error = "";
+$error   = "";
 
-// Handle bill addition
+// ✅ Add new bill
 if (isset($_POST['add_bill'])) {
-    $tenantID = $_POST['tenant_id'] ?? null;
+    $tenantID    = $_POST['tenant_id'] ?? null;
     $apartmentID = $_POST['apartment_id'] ?? null;
-    $billType = $_POST['type'] ?? '';
-    $amount = $_POST['amount'] ?? 0;
-    $billDate = $_POST['bill_date'] ?? '';
+    $billType    = $_POST['type'] ?? '';
+    $amount      = $_POST['amount'] ?? 0;
+    $billDate    = $_POST['bill_date'] ?? '';
 
     if ($tenantID && $apartmentID) {
-        $stmt = $pdo->prepare("INSERT INTO UtilityBills (TenantID, ApartmentID, Type, Amount, BillDate, Status) VALUES (?, ?, ?, ?, ?, 'Unpaid')");
+        $stmt = $pdo->prepare("
+            INSERT INTO utilitybills (TenantID, ApartmentID, Type, Amount, BillDate, Status) 
+            VALUES (?, ?, ?, ?, ?, 'Unpaid')
+        ");
         $stmt->execute([$tenantID, $apartmentID, $billType, $amount, $billDate]);
         $success = "✅ Utility bill added successfully!";
     } else {
@@ -27,36 +31,47 @@ if (isset($_POST['add_bill'])) {
     }
 }
 
-// Handle bill status update
+// ✅ Mark as Paid
 if (isset($_POST['mark_paid'])) {
-    $billID = $_POST['bill_id'];
-    $pdo->prepare("UPDATE UtilityBills SET Status = 'Paid' WHERE BillID = ?")->execute([$billID]);
+    $billID = $_POST['bill_id'] ?? null;
+    if ($billID) {
+        $stmt = $pdo->prepare("UPDATE utilitybills SET Status = 'Paid' WHERE BillID = ?");
+        $stmt->execute([$billID]);
+    }
 }
 
+// ✅ Tenants with apartments (for dropdowns)
+$stmtTenants = $pdo->prepare("
+    SELECT 
+        T.TenantID, T.FirstName, T.LastName, 
+        A.ApartmentID, A.BuildingName, A.UnitNumber 
+    FROM tenants T
+    JOIN leases L ON T.TenantID = L.TenantID 
+    JOIN apartments A ON L.ApartmentID = A.ApartmentID 
+    WHERE A.OwnerID = ?
+");
+$stmtTenants->execute([$ownerID]);
+$tenants = $stmtTenants->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch tenants with apartment info
-$tenants = $pdo->query("
-    SELECT T.TenantID, T.FirstName, T.LastName, A.ApartmentID, A.BuildingName, A.UnitNumber 
-    FROM Tenants T 
-    JOIN Leases L ON T.TenantID = L.TenantID 
-    JOIN Apartments A ON L.ApartmentID = A.ApartmentID 
-    WHERE A.OwnerID = $ownerID
-")->fetchAll();
-
-// Fetch bills
-$bills = $pdo->query("
+// ✅ Fetch all bills (with payment method if available)
+$stmtBills = $pdo->prepare("
     SELECT 
         UB.*, 
         T.FirstName, T.LastName, 
         A.BuildingName, A.UnitNumber,
         P.Pay_Method AS PaymentMethod
-    FROM UtilityBills UB
-    JOIN Tenants T ON UB.TenantID = T.TenantID
-    JOIN Apartments A ON UB.ApartmentID = A.ApartmentID
-    LEFT JOIN Payments P ON P.TenantID = UB.TenantID AND P.Amount = UB.Amount AND DATE(P.Pay_Date) = DATE(UB.BillDate)
-    WHERE A.OwnerID = $ownerID
+    FROM utilitybills UB
+    JOIN tenants T ON UB.TenantID = T.TenantID
+    JOIN apartments A ON UB.ApartmentID = A.ApartmentID
+    LEFT JOIN payments P 
+        ON P.TenantID = UB.TenantID 
+       AND P.Amount   = UB.Amount 
+       AND DATE(P.Pay_Date) = DATE(UB.BillDate)
+    WHERE A.OwnerID = ?
     ORDER BY UB.BillDate DESC
-")->fetchAll();
+");
+$stmtBills->execute([$ownerID]);
+$bills = $stmtBills->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
 <?php include('header.php'); ?>
@@ -116,19 +131,18 @@ $bills = $pdo->query("
 
     <!-- 🧾 Bills Table -->
     <table class="table table-bordered">
-       <thead class="table-light">
-    <tr>
-        <th>Tenant</th>
-        <th>Apartment</th>
-        <th>Type</th>
-        <th>Amount</th>
-        <th>Bill Date</th>
-        <th>Status</th>
-        <th>Payment Method</th> <!-- New Column -->
-        <th>Action</th>
-    </tr>
-</thead>
-
+        <thead class="table-light">
+            <tr>
+                <th>Tenant</th>
+                <th>Apartment</th>
+                <th>Type</th>
+                <th>Amount</th>
+                <th>Bill Date</th>
+                <th>Status</th>
+                <th>Payment Method</th>
+                <th>Action</th>
+            </tr>
+        </thead>
         <tbody>
             <?php foreach ($bills as $b): ?>
             <tr>
@@ -146,10 +160,9 @@ $bills = $pdo->query("
                 </td>
                 <td><?= $b['PaymentMethod'] ?? '—' ?></td>
                 <td>
-                    <?php if (!empty($b['Status']) && $b['Status'] === 'Unpaid' && !empty($b['UtilityBillID'])): ?>
+                    <?php if ($b['Status'] === 'Unpaid'): ?>
                         <form method="POST">
                             <input type="hidden" name="bill_id" value="<?= htmlspecialchars($b['BillID']) ?>">
-
                             <button type="submit" name="mark_paid" class="btn btn-sm btn-primary">Mark Paid</button>
                         </form>
                     <?php else: ?>
@@ -166,6 +179,8 @@ $bills = $pdo->query("
         <a href="admin_dashboard.php" class="btn btn-secondary">← Back to Dashboard</a>
     </div>
 </div>
+
+<?php include('footer.php'); ?>
 
 <style>
   /* Modern Background */

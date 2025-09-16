@@ -2,7 +2,7 @@
 session_start();
 require_once('database/db.php');
 
-// Ensure tenant is logged in
+// ✅ Ensure tenant is logged in
 if (!isset($_SESSION['TenantID'])) {
     $_SESSION['message'] = "⚠️ Please log in to apply for an apartment.";
     header("Location: tenant_login.php");
@@ -11,16 +11,16 @@ if (!isset($_SESSION['TenantID'])) {
 
 $tenantID = $_SESSION['TenantID'];
 
-// Fetch apartments not applied for
+// ✅ Fetch apartments not yet applied for by this tenant
 $stmt = $pdo->prepare("
     SELECT A.*
-    FROM Apartments A
+    FROM apartments A
     WHERE A.Available = 1
-    AND A.ApartmentID NOT IN (
-        SELECT ApartmentID 
-        FROM ApartmentApplications 
-        WHERE TenantID = ?
-    )
+      AND A.ApartmentID NOT IN (
+          SELECT ApartmentID 
+          FROM apartmentapplications 
+          WHERE TenantID = ?
+      )
 ");
 $stmt->execute([$tenantID]);
 $apartments = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -32,7 +32,7 @@ $apartments = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <h2>🏢 Available Apartments</h2>
 
     <?php if (isset($_SESSION['message'])): ?>
-        <div class="alert alert-info mt-3"><?= $_SESSION['message'] ?></div>
+        <div class="alert alert-info mt-3"><?= htmlspecialchars($_SESSION['message']) ?></div>
         <?php unset($_SESSION['message']); ?>
     <?php endif; ?>
 
@@ -56,9 +56,13 @@ $apartments = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             <td><?= htmlspecialchars($apt['BuildingName']) ?></td>
                             <td><?= htmlspecialchars($apt['UnitNumber']) ?></td>
                             <td>₱<?= number_format($apt['RentAmount'], 2) ?></td>
-                            <td><?= $apt['Bedrooms'] ?></td>
-                            <td><?= $apt['Bathrooms'] ?></td>
-                            <td><?= $apt['Apt_City'] ?>, <?= $apt['Apt_Brgy'] ?>, <?= $apt['Apt_Street'] ?></td>
+                            <td><?= htmlspecialchars($apt['Bedrooms']) ?></td>
+                            <td><?= htmlspecialchars($apt['Bathrooms']) ?></td>
+                            <td>
+                                <?= htmlspecialchars($apt['Apt_City']) ?>, 
+                                <?= htmlspecialchars($apt['Apt_Brgy']) ?>, 
+                                <?= htmlspecialchars($apt['Apt_Street']) ?>
+                            </td>
                             <td>
                                 <form method="POST" action="apply_apartment.php">
                                     <input type="hidden" name="apartment_id" value="<?= $apt['ApartmentID'] ?>">
@@ -71,9 +75,28 @@ $apartments = $stmt->fetchAll(PDO::FETCH_ASSOC);
             </table>
         </div>
     <?php else: ?>
-        <p class="text-muted mt-3">You've applied for all currently available apartments or none are available.</p>
+        <p class="text-muted mt-3">
+            You've applied for all currently available apartments or none are available.
+        </p>
     <?php endif; ?>
 </div>
+
+<?php include('footer.php'); ?>
+
+<!-- ✅ SweetAlert2 Popup -->
+<?php if (isset($_SESSION['message_flash'])): ?>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        Swal.fire({
+            title: 'Notice',
+            text: "<?= addslashes($_SESSION['message_flash']) ?>",
+            icon: 'info',
+            confirmButtonText: 'OK'
+        });
+    </script>
+    <?php unset($_SESSION['message_flash']); ?>
+<?php endif; ?>
+
 
 <style>
   /* Modern Background with image (no transparency overlay) */

@@ -1,5 +1,4 @@
-
-    <?php
+<?php
 session_start();
 require_once('database/db.php');
 
@@ -10,388 +9,102 @@ if (!isset($_SESSION['OwnerID'])) {
 
 $ownerID = $_SESSION['OwnerID'];
 
-// Fetch parking stats
-$parkingStats = $pdo->query("SELECT SUM(Status = 'Available') AS available, SUM(Status = 'Occupied') AS occupied FROM ParkingSpaces P JOIN Apartments A ON P.ApartmentID = A.ApartmentID WHERE A.OwnerID = $ownerID")->fetch();
+/** =======================
+ * DASHBOARD DATA FETCHING
+ * ======================= */
 
-// Fetch all apartments by this owner
-$stmtApt = $pdo->prepare("SELECT * FROM Apartments WHERE OwnerID = ?");
+// ✅ Parking stats (safe parameterized query)
+$stmt = $pdo->prepare("
+    SELECT 
+        SUM(CASE WHEN P.Status = 'Available' THEN 1 ELSE 0 END) AS available,
+        SUM(CASE WHEN P.Status = 'Occupied' THEN 1 ELSE 0 END) AS occupied
+    FROM parkingspaces P
+    JOIN apartments A ON P.ApartmentID = A.ApartmentID
+    WHERE A.OwnerID = ?
+");
+$stmt->execute([$ownerID]);
+$parkingStats = $stmt->fetch(PDO::FETCH_ASSOC) ?: ['available' => 0, 'occupied' => 0];
+
+// ✅ Fetch all apartments by this owner
+$stmtApt = $pdo->prepare("SELECT * FROM apartments WHERE OwnerID = ?");
 $stmtApt->execute([$ownerID]);
 $apartments = $stmtApt->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch active leases
-$stmtLease = $pdo->prepare("SELECT L.*, T.FirstName AS TenantFirstName, T.LastName AS TenantLastName, A.BuildingName, A.UnitNumber FROM Leases L JOIN Tenants T ON L.TenantID = T.TenantID JOIN Apartments A ON L.ApartmentID = A.ApartmentID WHERE A.OwnerID = ?");
+// ✅ Active leases
+$stmtLease = $pdo->prepare("
+    SELECT L.*, T.FirstName AS TenantFirstName, T.LastName AS TenantLastName, 
+           A.BuildingName, A.UnitNumber
+    FROM leases L
+    JOIN tenants T ON L.TenantID = T.TenantID
+    JOIN apartments A ON L.ApartmentID = A.ApartmentID
+    WHERE A.OwnerID = ?
+");
 $stmtLease->execute([$ownerID]);
 $leases = $stmtLease->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch maintenance requests
-$stmtReq = $pdo->prepare("SELECT MR.RequestID, MR.RequestDate, MR.RequestDetails, MR.RequestStatus, T.FirstName, T.LastName, A.BuildingName, A.UnitNumber FROM MaintenanceRequest MR JOIN Tenants T ON MR.TenantID = T.TenantID JOIN Apartments A ON MR.ApartmentID = A.ApartmentID WHERE A.OwnerID = ? ORDER BY MR.RequestDate DESC");
+// ✅ Maintenance requests
+$stmtReq = $pdo->prepare("
+    SELECT MR.RequestID, MR.RequestDate, MR.RequestDetails, MR.RequestStatus, 
+           T.FirstName, T.LastName, A.BuildingName, A.UnitNumber
+    FROM maintenancerequest MR
+    JOIN tenants T ON MR.TenantID = T.TenantID
+    JOIN apartments A ON MR.ApartmentID = A.ApartmentID
+    WHERE A.OwnerID = ?
+    ORDER BY MR.RequestDate DESC
+");
 $stmtReq->execute([$ownerID]);
 $requests = $stmtReq->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch available apartments
-$stmtAvailable = $pdo->prepare("SELECT AA.*, A.BuildingName, A.UnitNumber, A.Bedrooms, A.Bathrooms, A.RentAmount, A.Apt_City, A.Apt_Brgy, A.Apt_Street FROM ApartmentAvailability AA JOIN Apartments A ON AA.ApartmentID = A.ApartmentID WHERE A.OwnerID = ? AND AA.Status = 'Available' ORDER BY AA.Start_Date ASC");
+// ✅ Available apartments
+$stmtAvailable = $pdo->prepare("
+    SELECT AA.*, A.BuildingName, A.UnitNumber, A.Bedrooms, A.Bathrooms, 
+           A.RentAmount, A.Apt_City, A.Apt_Brgy, A.Apt_Street
+    FROM apartmentavailability AA
+    JOIN apartments A ON AA.ApartmentID = A.ApartmentID
+    WHERE A.OwnerID = ? AND AA.Status = 'Available'
+    ORDER BY AA.Start_Date ASC
+");
 $stmtAvailable->execute([$ownerID]);
 $availableApts = $stmtAvailable->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch pending apartment applications
-$stmtApps = $pdo->prepare("SELECT AA.ApplicationID, AA.ApartmentID, AA.TenantID, AA.Status, T.FirstName, T.LastName, A.BuildingName, A.UnitNumber FROM ApartmentApplications AA JOIN Tenants T ON AA.TenantID = T.TenantID JOIN Apartments A ON AA.ApartmentID = A.ApartmentID WHERE AA.Status = 'Pending' AND A.OwnerID = ?");
+// ✅ Pending apartment applications
+$stmtApps = $pdo->prepare("
+    SELECT AA.ApplicationID, AA.ApartmentID, AA.TenantID, AA.Status, 
+           T.FirstName, T.LastName, A.BuildingName, A.UnitNumber
+    FROM apartmentapplications AA
+    JOIN tenants T ON AA.TenantID = T.TenantID
+    JOIN apartments A ON AA.ApartmentID = A.ApartmentID
+    WHERE AA.Status = 'Pending' AND A.OwnerID = ?
+");
 $stmtApps->execute([$ownerID]);
 $pendingApps = $stmtApps->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch tenants with leases
-$stmtTenants = $pdo->prepare("SELECT T.TenantID, T.FirstName, T.LastName, T.Email FROM Tenants T JOIN Leases L ON L.TenantID = T.TenantID JOIN Apartments A ON L.ApartmentID = A.ApartmentID WHERE A.OwnerID = ?");
+// ✅ Tenants with leases
+$stmtTenants = $pdo->prepare("
+    SELECT DISTINCT T.TenantID, T.FirstName, T.LastName, T.Email
+    FROM tenants T
+    JOIN leases L ON L.TenantID = T.TenantID
+    JOIN apartments A ON L.ApartmentID = A.ApartmentID
+    WHERE A.OwnerID = ?
+");
 $stmtTenants->execute([$ownerID]);
 $tenants = $stmtTenants->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch utility bills
-$stmtBills = $pdo->prepare("SELECT U.*, T.FirstName, T.LastName, A.BuildingName, A.UnitNumber FROM UtilityBills U JOIN Tenants T ON U.TenantID = T.TenantID JOIN Apartments A ON U.ApartmentID = A.ApartmentID WHERE A.OwnerID = ? ORDER BY U.BillDate DESC");
+// ✅ Utility bills
+$stmtBills = $pdo->prepare("
+    SELECT U.*, T.FirstName, T.LastName, A.BuildingName, A.UnitNumber
+    FROM utilitybills U
+    JOIN tenants T ON U.TenantID = T.TenantID
+    JOIN apartments A ON U.ApartmentID = A.ApartmentID
+    WHERE A.OwnerID = ?
+    ORDER BY U.BillDate DESC
+");
 $stmtBills->execute([$ownerID]);
 $utilityBills = $stmtBills->fetchAll(PDO::FETCH_ASSOC);
+
+include('header.php');
 ?>
 
-<?php include('header.php'); ?>
-
-<?php if (isset($_SESSION['message'])): ?>
-    <div class="alert alert-info mt-3"><?= $_SESSION['message']; ?></div>
-    <?php unset($_SESSION['message']); ?>
-<?php endif; ?>
-
-<div class="dashboard-container">
-    <!-- Sidebar -->
-    <div class="sidebar">
-        <div class="sidebar-header">
-            <h3>📊 Dashboard</h3>
-            <p>Welcome, <?= htmlspecialchars($_SESSION['OwnerName']) ?></p>
-        </div>
-        
-        <nav class="sidebar-nav">
-            <ul>
-                <li><a href="#overview" class="nav-link active" data-section="overview">🏠 Overview</a></li>
-                <li><a href="#pending-apps" class="nav-link" data-section="pending-apps">📨 Pending Applications <span class="badge"><?= count($pendingApps) ?></span></a></li>
-                <li><a href="#tenants" class="nav-link" data-section="tenants">👤 Tenant Accounts</a></li>
-                <li><a href="#available-apts" class="nav-link" data-section="available-apts">✅ Available Apartments</a></li>
-                <li><a href="#all-apts" class="nav-link" data-section="all-apts">📋 All Apartments</a></li>
-                <li><a href="#leases" class="nav-link" data-section="leases">📄 Active Leases</a></li>
-                <li><a href="#maintenance" class="nav-link" data-section="maintenance">🛠 Maintenance Requests</a></li>
-                <li><a href="#parking" class="nav-link" data-section="parking">🚘 Parking Overview</a></li>
-                <li><a href="#utilities" class="nav-link" data-section="utilities">💡 Utility Bills</a></li>
-            </ul>
-        </nav>
-    </div>
-
-    <!-- Main Content -->
-    <div class="main-content">
-        <!-- Overview Section -->
-        <div id="overview" class="content-section active">
-            <h2>Dashboard Overview</h2>
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-icon">🏠</div>
-                    <div class="stat-info">
-                        <h3><?= count($apartments) ?></h3>
-                        <p>Total Apartments</p>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon">👥</div>
-                    <div class="stat-info">
-                        <h3><?= count($tenants) ?></h3>
-                        <p>Active Tenants</p>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon">📋</div>
-                    <div class="stat-info">
-                        <h3><?= count($leases) ?></h3>
-                        <p>Active Leases</p>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon">🚘</div>
-                    <div class="stat-info">
-                        <h3><?= $parkingStats['available'] ?? 0 ?></h3>
-                        <p>Parking Available</p>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="recent-activity">
-                <h4>Recent Activity</h4>
-                <div class="activity-list">
-                    <?php if ($requests): ?>
-                        <?php foreach (array_slice($requests, 0, 5) as $req): ?>
-                            <div class="activity-item">
-                                <span class="activity-icon">🛠</span>
-                                <div class="activity-content">
-                                    <p><strong><?= $req['FirstName'] . ' ' . $req['LastName'] ?></strong> submitted a maintenance request</p>
-                                    <small><?= $req['RequestDate'] ?></small>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                </div>
-            </div>
-        </div>
-
-        <!-- Pending Applications Section -->
-        <div id="pending-apps" class="content-section">
-            <h2>📨 Pending Apartment Applications</h2>
-            <?php if ($pendingApps): ?>
-                <table class="table table-bordered">
-                    <thead>
-                        <tr><th>Tenant</th><th>Apartment</th><th>Action</th></tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($pendingApps as $app): ?>
-                        <tr>
-                            <td><?= $app['FirstName'] . ' ' . $app['LastName'] ?></td>
-                            <td><?= $app['BuildingName'] ?> - Unit <?= $app['UnitNumber'] ?></td>
-                            <td>
-                                <form method="POST" action="approve_application.php">
-                                    <input type="hidden" name="application_id" value="<?= $app['ApplicationID'] ?>">
-                                    <button type="submit" class="btn btn-success btn-sm">Approve</button>
-                                </form>
-                            </td>
-                        </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            <?php else: ?>
-                <p class="text-muted">No pending applications at the moment.</p>
-            <?php endif; ?>
-        </div>
-
-        <!-- Tenants Section -->
-        <div id="tenants" class="content-section">
-            <h2>👤 Tenant Accounts</h2>
-            <?php if ($tenants): ?>
-                <table class="table table-bordered">
-                    <thead>
-                        <tr><th>Name</th><th>Email</th><th>Action</th></tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($tenants as $tenant): ?>
-                        <tr>
-                            <td><?= $tenant['FirstName'] . ' ' . $tenant['LastName'] ?></td>
-                            <td><?= $tenant['Email'] ?></td>
-                            <td>
-                                <a href="delete_tenant.php?id=<?= $tenant['TenantID'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this tenant?');">🗑️ Delete</a>
-                            </td>
-                        </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            <?php else: ?>
-                <p class="text-muted">No tenants found for your apartments.</p>
-            <?php endif; ?>
-        </div>
-
-        <!-- Available Apartments Section -->
-        <div id="available-apts" class="content-section">
-            <h2>✅ Currently Available Apartments</h2>
-            <?php if ($availableApts): ?>
-                <table class="table table-bordered">
-                    <thead>
-                        <tr>
-                            <th>Building</th>
-                            <th>Unit</th>
-                            <th>Rent</th>
-                            <th>Bedrooms</th>
-                            <th>Bathrooms</th>
-                            <th>Location</th>
-                            <th>Available From</th>
-                            <th>Until</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($availableApts as $apt): ?>
-                        <tr>
-                            <td><?= $apt['BuildingName'] ?></td>
-                            <td><?= $apt['UnitNumber'] ?></td>
-                            <td>₱<?= number_format($apt['RentAmount'], 2) ?></td>
-                            <td><?= $apt['Bedrooms'] ?></td>
-                            <td><?= $apt['Bathrooms'] ?></td>
-                            <td><?= $apt['Apt_City'] ?>, <?= $apt['Apt_Brgy'] ?>, <?= $apt['Apt_Street'] ?></td>
-                            <td><?= $apt['Start_Date'] ?></td>
-                            <td><?= $apt['End_Date'] ?></td>
-                        </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            <?php else: ?>
-                <p class="text-muted">No apartments are currently marked as available.</p>
-            <?php endif; ?>
-        </div>
-
-        <!-- All Apartments Section -->
-        <div id="all-apts" class="content-section">
-            <h2>📋 All Apartments</h2>
-            <?php if ($apartments): ?>
-                <table class="table table-bordered">
-                    <thead>
-                        <tr>
-                            <th>Building</th>
-                            <th>Unit</th>
-                            <th>Rent</th>
-                            <th>Bedrooms</th>
-                            <th>Bathrooms</th>
-                            <th>Location</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($apartments as $apt): ?>
-                        <tr>
-                            <td><?= $apt['BuildingName'] ?></td>
-                            <td><?= $apt['UnitNumber'] ?></td>
-                            <td>₱<?= number_format($apt['RentAmount'], 2) ?></td>
-                            <td><?= $apt['Bedrooms'] ?></td>
-                            <td><?= $apt['Bathrooms'] ?></td>
-                            <td><?= $apt['Apt_City'] ?>, <?= $apt['Apt_Brgy'] ?>, <?= $apt['Apt_Street'] ?></td>
-                            <td><?= $apt['Available'] ? 'Available' : 'Occupied' ?></td>
-                        </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            <?php else: ?>
-                <p class="text-muted">No apartments found.</p>
-            <?php endif; ?>
-            <div class="action-buttons">
-                <a href="admin_add_apartment.php" class="btn btn-outline-primary btn-sm">➕ Add Apartment</a>
-                <a href="admin_apartment_availability.php" class="btn btn-outline-info btn-sm">📅 Manage Availability</a>
-            </div>
-        </div>
-
-        <!-- Leases Section -->
-        <div id="leases" class="content-section">
-            <h2>📄 Active Leases</h2>
-            <?php if ($leases): ?>
-                <table class="table table-bordered">
-                    <thead>
-                        <tr>
-                            <th>Tenant</th>
-                            <th>Apartment</th>
-                            <th>Start Date</th>
-                            <th>End Date</th>
-                            <th>Monthly Rent</th>
-                            <th>Deposit</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($leases as $lease): ?>
-                        <tr>
-                            <td><?= $lease['TenantFirstName'] . ' ' . $lease['TenantLastName'] ?></td>
-                            <td><?= $lease['BuildingName'] ?> - Unit <?= $lease['UnitNumber'] ?></td>
-                            <td><?= $lease['StartDate'] ?></td>
-                            <td><?= $lease['EndDate'] ?></td>
-                            <td>₱<?= number_format($lease['MonthlyRent'], 2) ?></td>
-                            <td>₱<?= number_format($lease['DepositAmount'], 2) ?></td>
-                        </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            <?php else: ?>
-                <p class="text-muted">No leases found.</p>
-            <?php endif; ?>
-            <a href="admin_add_leases.php" class="btn btn-outline-primary btn-sm">➕ Add Lease</a>
-        </div>
-
-        <!-- Maintenance Section -->
-        <div id="maintenance" class="content-section">
-            <h2>🛠 Maintenance Requests</h2>
-            <?php if ($requests): ?>
-                <table class="table table-bordered">
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Tenant</th>
-                            <th>Apartment</th>
-                            <th>Request Details</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($requests as $req): ?>
-                        <tr>
-                            <td><?= $req['RequestDate'] ?></td>
-                            <td><?= $req['FirstName'] . ' ' . $req['LastName'] ?></td>
-                            <td><?= $req['BuildingName'] ?> - Unit <?= $req['UnitNumber'] ?></td>
-                            <td><?= nl2br(htmlspecialchars($req['RequestDetails'])) ?></td>
-                            <td>
-                                <?php if ($req['RequestStatus'] === 'Done'): ?>
-                                    <span class="badge bg-success">Done</span>
-                                <?php else: ?>
-                                    <span class="badge bg-warning text-dark">Pending</span>
-                                <?php endif; ?>
-                            </td>
-                        </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            <?php else: ?>
-                <p class="text-muted">No maintenance requests submitted.</p>
-            <?php endif; ?>
-        </div>
-
-        <!-- Parking Section -->
-        <div id="parking" class="content-section">
-            <h2>🚘 Parking Overview</h2>
-            <div class="parking-stats">
-                <div class="stat-item">
-                    <span class="stat-label">Available Spaces:</span>
-                    <span class="stat-value"><?= $parkingStats['available'] ?? 0 ?></span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">Occupied Spaces:</span>
-                    <span class="stat-value"><?= $parkingStats['occupied'] ?? 0 ?></span>
-                </div>
-            </div>
-            <a href="parking_spaces.php" class="btn btn-outline-secondary btn-sm">Manage Parking</a>
-        </div>
-
-        <!-- Utilities Section -->
-        <div id="utilities" class="content-section">
-            <h2>💡 Utility Bills</h2>
-            <?php if ($utilityBills): ?>
-                <table class="table table-bordered">
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Tenant</th>
-                            <th>Apartment</th>
-                            <th>Type</th>
-                            <th>Amount</th>
-                            <th>Status</th>
-                            <th>Method</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($utilityBills as $bill): ?>
-                        <tr>
-                            <td><?= $bill['BillDate'] ?></td>
-                            <td><?= $bill['FirstName'] . ' ' . $bill['LastName'] ?></td>
-                            <td><?= $bill['BuildingName'] ?> - Unit <?= $bill['UnitNumber'] ?></td>
-                            <td><?= $bill['Type'] ?></td>
-                            <td>₱<?= number_format($bill['Amount'], 2) ?></td>
-                            <td>
-                                <?php if ($bill['Status'] === 'Paid'): ?>
-                                    <span class="badge bg-success">Paid</span>
-                                <?php else: ?>
-                                    <span class="badge bg-danger">Unpaid</span>
-                                <?php endif; ?>
-                            </td>
-                            <td><?= htmlspecialchars($bill['PaymentMethod'] ?? 'N/A') ?></td>
-                        </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            <?php else: ?>
-                <p class="text-muted">No utility bills recorded.</p>
-            <?php endif; ?>
-            <a href="admin_utilities.php" class="btn btn-outline-info btn-sm">➕ Add Utility Bill</a>
-        </div>
-    </div>
-</div>
 
 <style>
 /* Base Styles */

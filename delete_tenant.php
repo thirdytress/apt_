@@ -10,8 +10,8 @@ if (!isset($_GET['id'])) {
 
 $tenantID = $_GET['id'];
 
-// Check for existing leases
-$leaseCheck = $pdo->prepare("SELECT COUNT(*) FROM Leases WHERE TenantID = ?");
+// ✅ Check for existing leases
+$leaseCheck = $pdo->prepare("SELECT COUNT(*) FROM leases WHERE TenantID = ?");
 $leaseCheck->execute([$tenantID]);
 $leaseCount = $leaseCheck->fetchColumn();
 
@@ -21,8 +21,8 @@ if ($leaseCount > 0) {
     exit();
 }
 
-// Proceed with deletion
-$stmt = $pdo->prepare("DELETE FROM Tenants WHERE TenantID = ?");
+// ✅ Proceed with deletion
+$stmt = $pdo->prepare("DELETE FROM tenants WHERE TenantID = ?");
 $stmt->execute([$tenantID]);
 
 $_SESSION['message'] = "✅ Tenant deleted successfully.";
