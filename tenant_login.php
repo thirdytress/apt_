@@ -9,7 +9,7 @@ if (isset($_POST['login'])) {
     $password = $_POST['password'] ?? '';
 
     // ✅ Fetch tenant by email
-    $stmt = $pdo->prepare("SELECT * FROM tenants WHERE tenant_email = ?");
+    $stmt = $pdo->prepare("SELECT * FROM tenants WHERE Email = ?");
     $stmt->execute([$email]);
     $tenant = $stmt->fetch(PDO::FETCH_ASSOC);
 
