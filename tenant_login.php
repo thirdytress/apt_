@@ -5,26 +5,26 @@ require_once('database/db.php');
 $error = "";
 
 if (isset($_POST['login'])) {
-    $email = $_POST['Email'];
-    $password = $_POST['password'];
+    $email = $_POST['email'] ?? '';
+    $password = $_POST['password'] ?? '';
 
-    // ✅ FIXED: column name should be "Email"
-    $stmt = $pdo->prepare("SELECT * FROM tenants WHERE Email = ?");
+    // ✅ Fetch tenant by email
+    $stmt = $pdo->prepare("SELECT * FROM tenants WHERE tenant_email = ?");
     $stmt->execute([$email]);
     $tenant = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if ($tenant && password_verify($password, $tenant['password'])) {
-        $_SESSION['TenantID'] = $tenant['tenant_ID'];
-        $_SESSION['TenantName'] = $tenant['firstname'] . ' ' . $tenant['lastname'];
+    if ($tenant && password_verify($password, $tenant['tenant_pass'])) {
+        $_SESSION['TenantID']   = $tenant['TenantID'];
+        $_SESSION['TenantName'] = $tenant['tenant_FN'] . ' ' . $tenant['tenant_LN'];
 
+        // ✅ Redirect BEFORE output
         header("Location: tenant_dashboard.php");
         exit();
     } else {
-        $error = "Invalid email or password.";
+        $error = "⚠️ Invalid email or password.";
     }
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -126,8 +126,8 @@ if (isset($_POST['login'])) {
 
       <form method="POST">
         <div class="form-group">
-          <label for="Email" class="form-label">Email Address</label>
-          <input type="Email" id="Email" name="Email" class="form-input" placeholder="Enter your email" required>
+          <label for="email" class="form-label">Email Address</label>
+          <input type="email" id="email" name="email" class="form-input" placeholder="Enter your email" required>
         </div>
         <div class="form-group">
           <label for="password" class="form-label">Password</label>
