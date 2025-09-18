@@ -5,26 +5,26 @@ require_once('database/db.php');
 $error = "";
 
 if (isset($_POST['login'])) {
-    $email = $_POST['email'] ?? '';
-    $password = $_POST['password'] ?? '';
+    $email = $_POST['email'];
+    $password = $_POST['password'];
 
-    // ✅ Fetch tenant by email
-    $stmt = $pdo->prepare("SELECT * FROM tenants WHERE tenant_email = ?");
+    // ✅ FIXED: column name should be "email"
+    $stmt = $pdo->prepare("SELECT * FROM tenants WHERE email = ?");
     $stmt->execute([$email]);
     $tenant = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if ($tenant && password_verify($password, $tenant['tenant_pass'])) {
-        $_SESSION['TenantID']   = $tenant['TenantID'];
-        $_SESSION['TenantName'] = $tenant['tenant_FN'] . ' ' . $tenant['tenant_LN'];
+    if ($tenant && password_verify($password, $tenant['password'])) {
+        $_SESSION['TenantID'] = $tenant['tenant_ID'];
+        $_SESSION['TenantName'] = $tenant['firstname'] . ' ' . $tenant['lastname'];
 
-        // ✅ Redirect BEFORE output
         header("Location: tenant_dashboard.php");
         exit();
     } else {
-        $error = "⚠️ Invalid email or password.";
+        $error = "Invalid email or password.";
     }
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
