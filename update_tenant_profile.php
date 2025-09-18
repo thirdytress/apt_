@@ -10,31 +10,37 @@ if (!isset($_SESSION['TenantID'])) {
 $tenantID = $_SESSION['TenantID'];
 
 // Fetch tenant details
-$stmt = $pdo->prepare("SELECT * FROM Tenants WHERE TenantID = ?");
+$stmt = $pdo->prepare("SELECT * FROM tenants WHERE tenant_ID = ?");
 $stmt->execute([$tenantID]);
 $tenant = $stmt->fetch(PDO::FETCH_ASSOC);
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $firstName = trim($_POST['FirstName']);
-    $lastName = trim($_POST['LastName']);
-    $email = trim($_POST['Email']);
-    $phone = trim($_POST['PhoneNumber']);
+    $firstName = trim($_POST['firstname']);
+    $lastName  = trim($_POST['lastname']);
+    $email     = trim($_POST['email']);
+    $phone     = trim($_POST['phonenumber']);
 
     $errors = [];
     if (empty($firstName)) $errors[] = "First name is required.";
-    if (empty($lastName)) $errors[] = "Last name is required.";
+    if (empty($lastName))  $errors[] = "Last name is required.";
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = "Please enter a valid email address.";
-    if (empty($phone)) $errors[] = "Phone number is required.";
+    if (empty($phone))     $errors[] = "Phone number is required.";
 
-    $emailCheck = $pdo->prepare("SELECT TenantID FROM Tenants WHERE Email = ? AND TenantID != ?");
+    // Check if email is already used by another tenant
+    $emailCheck = $pdo->prepare("SELECT tenant_ID FROM tenants WHERE email = ? AND tenant_ID != ?");
     $emailCheck->execute([$email, $tenantID]);
-    if ($emailCheck->fetch()) $errors[] = "This email is already registered by another user.";
+    if ($emailCheck->fetch()) {
+        $errors[] = "This email is already registered by another user.";
+    }
 
     if (empty($errors)) {
         try {
-            $update = $pdo->prepare("UPDATE Tenants SET FirstName = ?, LastName = ?, Email = ?, PhoneNumber = ? WHERE TenantID = ?");
+            $update = $pdo->prepare("UPDATE tenants 
+                                     SET firstname = ?, lastname = ?, email = ?, phonenumber = ? 
+                                     WHERE tenant_ID = ?");
             $update->execute([$firstName, $lastName, $email, $phone, $tenantID]);
+
             $_SESSION['message'] = "✅ Your information has been updated successfully.";
             $_SESSION['message_type'] = "success";
             header("Location: tenant_dashboard.php");
@@ -45,6 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 ?>
+
 
 <?php include('header.php'); ?>
 

@@ -9,8 +9,8 @@ if (!isset($_SESSION['TenantID'])) {
 
 $tenantID = $_SESSION['TenantID'];
 
-// Get recent payments
-$stmt = $pdo->prepare("SELECT * FROM Payments WHERE TenantID = ? ORDER BY Pay_Date DESC");
+// ✅ Get recent payments (correct column names)
+$stmt = $pdo->prepare("SELECT * FROM payments WHERE TenantID = ? ORDER BY PaymentDate DESC");
 $stmt->execute([$tenantID]);
 $payments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
@@ -29,14 +29,22 @@ $payments = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             <th><i class="fas fa-calendar-alt"></i> Payment Date</th>
                             <th><i class="fas fa-money-bill-wave"></i> Amount</th>
                             <th><i class="fas fa-credit-card"></i> Method</th>
+                            <th><i class="fas fa-check-circle"></i> Status</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php foreach ($payments as $pay): ?>
                             <tr>
-                                <td><?= htmlspecialchars($pay['Pay_Date']) ?></td>
+                                <td><?= htmlspecialchars($pay['PaymentDate']) ?></td>
                                 <td><span class="badge bg-success">₱<?= number_format($pay['Amount'], 2) ?></span></td>
-                                <td><?= htmlspecialchars($pay['Pay_Method']) ?></td>
+                                <td><?= htmlspecialchars($pay['PaymentMethod']) ?></td>
+                                <td>
+                                    <?php if ($pay['Status'] === 'Pending'): ?>
+                                        <span class="badge bg-warning">⏳ Pending</span>
+                                    <?php else: ?>
+                                        <span class="badge bg-success">✅ <?= htmlspecialchars($pay['Status']) ?></span>
+                                    <?php endif; ?>
+                                </td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -56,6 +64,16 @@ $payments = $stmt->fetchAll(PDO::FETCH_ASSOC);
         </div>
     </div>
 </main>
+
+<style>
+  /* (your existing CSS remains unchanged) */
+</style>
+
+<!-- Load FontAwesome Icons -->
+<script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+
+<?php include('footer.php'); ?>
+
 
 <style>
   /* Smooth fade-in effect */

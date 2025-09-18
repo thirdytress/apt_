@@ -16,21 +16,28 @@ if (isset($_POST['pay_bill'])) {
     $method = $_POST['payment_method'] ?? 'Unknown';
     $receiptFile = null;
 
+    // ✅ Receipt Upload
     if (isset($_FILES['receipt']) && $_FILES['receipt']['error'] === 0) {
         $targetDir = "uploads/";
         if (!is_dir($targetDir)) mkdir($targetDir, 0777, true);
         $fileName = time() . "_" . basename($_FILES["receipt"]["name"]);
         $targetFilePath = $targetDir . $fileName;
-        if (move_uploaded_file($_FILES["receipt"]["tmp_name"], $targetFilePath)) $receiptFile = $fileName;
+        if (move_uploaded_file($_FILES["receipt"]["tmp_name"], $targetFilePath)) {
+            $receiptFile = $fileName;
+        }
     }
 
-    $stmt = $pdo->prepare("UPDATE UtilityBills SET Status = 'Paid', PaymentMethod = ? WHERE BillID = ? AND TenantID = ?");
+    // ✅ Update bill status
+    $stmt = $pdo->prepare("UPDATE utilitybills 
+                           SET status = 'Paid', paymentmethod = ? 
+                           WHERE bill_ID = ? AND tenant_ID = ?");
     $stmt->execute([$method, $billID, $tenantID]);
 
+    // ✅ Insert into Payments (using data from utilitybills)
     $stmt = $pdo->prepare("
-        INSERT INTO Payments (TenantID, Amount, Pay_Method, Pay_Date, BillID, Receipt)
-        SELECT TenantID, Amount, ?, NOW(), BillID, ? 
-        FROM UtilityBills WHERE BillID = ? AND TenantID = ?
+        INSERT INTO payments (tenant_ID, amount, pay_method, pay_date, bill_ID, receipt)
+        SELECT tenant_ID, amount, ?, NOW(), bill_ID, ? 
+        FROM utilitybills WHERE bill_ID = ? AND tenant_ID = ?
     ");
     $stmt->execute([$method, $receiptFile, $billID, $tenantID]);
 
@@ -38,15 +45,16 @@ if (isset($_POST['pay_bill'])) {
     exit();
 }
 
+// ✅ Fetch bills with apartment info
 $bills = $pdo->prepare("
-    SELECT UB.*, A.BuildingName, A.UnitNumber 
-    FROM UtilityBills UB
-    JOIN Apartments A ON UB.ApartmentID = A.ApartmentID
-    WHERE UB.TenantID = ?
-    ORDER BY UB.BillDate DESC
+    SELECT ub.*, a.buildingname, a.unitnumber 
+    FROM utilitybills ub
+    JOIN apartments a ON ub.apartment_ID = a.apartment_ID
+    WHERE ub.tenant_ID = ?
+    ORDER BY ub.bill_date DESC
 ");
 $bills->execute([$tenantID]);
-$billList = $bills->fetchAll();
+$billList = $bills->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
 <?php include('header.php'); ?>
@@ -173,7 +181,7 @@ body {
     box-shadow: 0 12px 30px rgba(0,0,0,0.15);
 }
 .card-title {
-    font-weight: 600;
+    font-weight: 600;z
     color: #0d6efd;
 }
 

@@ -11,7 +11,8 @@ if (isset($_POST['register'])) {
     $phone = $_POST['phone'];
     $password = password_hash($_POST['password'], PASSWORD_DEFAULT);
 
-    $check = $pdo->prepare("SELECT * FROM Tenants WHERE Email = ?");
+    // ✅ Check if email already exists
+    $check = $pdo->prepare("SELECT * FROM tenants WHERE tenant_email = ?");
     $check->execute([$email]);
 
     if ($check->rowCount() > 0) {
@@ -23,16 +24,18 @@ if (isset($_POST['register'])) {
             });
         </script>";
     } else {
-        $stmt = $pdo->prepare("INSERT INTO Tenants (FirstName, LastName, Email, PhoneNumber, password)
+        // ✅ Insert tenant
+        $stmt = $pdo->prepare("INSERT INTO tenants (tenant_FN, tenant_LN, tenant_email, tenant_phonenumber, tenant_password)
                                VALUES (?, ?, ?, ?, ?)");
         $stmt->execute([$first, $last, $email, $phone, $password]);
 
         $tenantID = $pdo->lastInsertId();
 
+        // ✅ If registering for a specific apartment, auto-apply
         if (!empty($_POST['apt_id'])) {
             $aptID = $_POST['apt_id'];
-            $applyStmt = $pdo->prepare("INSERT INTO ApartmentApplications (TenantID, ApartmentID, ApplicationDate)
-                                        VALUES (?, ?, CURDATE())");
+            $applyStmt = $pdo->prepare("INSERT INTO apartmentapplications (tenant_ID, apartment_ID, status, application_date)
+                                        VALUES (?, ?, 'Pending', CURDATE())");
             $applyStmt->execute([$tenantID, $aptID]);
         }
 
@@ -48,6 +51,7 @@ if (isset($_POST['register'])) {
     }
 }
 ?>
+
 
 <!DOCTYPE html>
 <html lang="en">

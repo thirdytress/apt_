@@ -10,21 +10,24 @@ if (!isset($_SESSION['TenantID'])) {
 $tenantID = $_SESSION['TenantID'];
 $successMessage = "";
 
-// Get apartment assigned to tenant
-$stmt = $pdo->prepare("SELECT ApartmentID FROM Leases WHERE TenantID = ?");
+// ✅ Get apartment assigned to tenant
+$stmt = $pdo->prepare("SELECT ApartmentID FROM leases WHERE TenantID = ?");
 $stmt->execute([$tenantID]);
 $lease = $stmt->fetch(PDO::FETCH_ASSOC);
 $apartmentID = $lease ? $lease['ApartmentID'] : null;
 
-// Handle request submission
+// ✅ Handle request submission
 if (isset($_POST['submit_request']) && $apartmentID) {
-    $requestDate = date('Y-m-d');
-    $requestDetails = $_POST['request_details'];
+    $requestDate    = date('Y-m-d');
+    $requestDetails = $_POST['request_details'] ?? '';
 
-    $stmt = $pdo->prepare("INSERT INTO MaintenanceRequest (TenantID, ApartmentID, RequestDate, RequestDetails) VALUES (?, ?, ?, ?)");
+    $stmt = $pdo->prepare("
+        INSERT INTO maintenancerequests (TenantID, ApartmentID, RequestDate, RequestDetails, Status) 
+        VALUES (?, ?, ?, ?, 'Pending')
+    ");
     $stmt->execute([$tenantID, $apartmentID, $requestDate, $requestDetails]);
 
-    $successMessage = "Maintenance request submitted successfully!";
+    $successMessage = "✅ Maintenance request submitted successfully!";
 }
 ?>
 
@@ -66,7 +69,7 @@ if (isset($_POST['submit_request']) && $apartmentID) {
             </form>
         <?php else: ?>
             <div class="alert alert-danger text-center">
-                No active lease found. Please contact the admin.
+                ⚠️ No active lease found. Please contact the admin.
             </div>
             <div class="text-center">
                 <button type="button" onclick="history.back()" class="btn btn-secondary mt-3">← Go Back</button>
@@ -77,8 +80,9 @@ if (isset($_POST['submit_request']) && $apartmentID) {
 
 <!-- Footer -->
 <footer>
-    <p>© 2025 ApartmentHub. All Rights Reserved.</p>
+    <p>© <?= date("Y") ?> ApartmentHub. All Rights Reserved.</p>
 </footer>
+
 
 <style>
   body {

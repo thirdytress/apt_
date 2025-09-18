@@ -8,29 +8,40 @@ if (!isset($_SESSION['TenantID'])) {
 }
 
 $tenantID = $_SESSION['TenantID'];
-$parkingSpot = null;
 $message = "";
 
-// Get parking info for this tenant
-$stmt = $pdo->prepare("SELECT * FROM ParkingSpaces WHERE AssignedTo = ?");
+// ✅ Get current parking spot (if assigned)
+$stmt = $pdo->prepare("SELECT * FROM parkingspaces WHERE AssignedTo = ?");
 $stmt->execute([$tenantID]);
 $parkingSpot = $stmt->fetch(PDO::FETCH_ASSOC);
 
-// Request spot (if not assigned yet)
+// ✅ Handle parking request
 if (isset($_POST['request_spot']) && !$parkingSpot) {
-    $spotNumber = $_POST['spot_number'];
+    $spotID = $_POST['spot_id'];
 
-    // Check if spot is already taken
-    $check = $pdo->prepare("SELECT * FROM ParkingSpaces WHERE SpaceNumber = ?");
-    $check->execute([$spotNumber]);
-    if ($check->fetch()) {
-        $message = "Spot already taken. Try another one.";
+    // Check if spot is available
+    $check = $pdo->prepare("SELECT * FROM parkingspaces WHERE ParkingID = ? AND Status = 'Available'");
+    $check->execute([$spotID]);
+    $spot = $check->fetch(PDO::FETCH_ASSOC);
+
+    if ($spot) {
+        // Assign to tenant
+        $update = $pdo->prepare("UPDATE parkingspaces SET AssignedTo = ?, Status = 'Occupied' WHERE ParkingID = ?");
+        $update->execute([$tenantID, $spotID]);
+
+        $message = "✅ Parking spot assigned!";
+        header("Refresh:1");
+        exit();
     } else {
-        $insert = $pdo->prepare("INSERT INTO ParkingSpaces (ApartmentID, SpaceNumber, Status, AssignedTo) VALUES (NULL, ?, 'Occupied', ?)");
-        $insert->execute([$spotNumber, $tenantID]);
-        $message = "Parking spot assigned!";
-        header("Refresh: 1");
+        $message = "⚠️ Spot is already taken. Please try another.";
     }
+}
+
+// ✅ Fetch available spots for dropdown
+$availableSpots = [];
+if (!$parkingSpot) {
+    $spots = $pdo->query("SELECT * FROM parkingspaces WHERE Status = 'Available' ORDER BY SpaceNumber ASC");
+    $availableSpots = $spots->fetchAll(PDO::FETCH_ASSOC);
 }
 ?>
 
@@ -58,14 +69,26 @@ if (isset($_POST['request_spot']) && !$parkingSpot) {
         <span class="status">✅ Assigned</span>
       </div>
     <?php else: ?>
-      <form method="POST">
-        <label class="form-label">Request Parking Spot</label>
-        <input type="text" name="spot_number" class="form-control" required placeholder="e.g. P-12">
-        <button type="submit" name="request_spot" class="btn">Request Spot</button>
-      </form>
+      <?php if ($availableSpots): ?>
+        <form method="POST">
+          <label class="form-label">Select Available Spot</label>
+          <select name="spot_id" class="form-control" required>
+            <option value="">-- Choose a Spot --</option>
+            <?php foreach ($availableSpots as $spot): ?>
+              <option value="<?= $spot['ParkingID'] ?>">Spot <?= htmlspecialchars($spot['SpaceNumber']) ?></option>
+            <?php endforeach; ?>
+          </select>
+          <button type="submit" name="request_spot" class="btn">Request Spot</button>
+        </form>
+      <?php else: ?>
+        <div class="alert alert-info">🚫 No available parking spots at the moment.</div>
+      <?php endif; ?>
     <?php endif; ?>
   </div>
 </div>
+
+<?php include('footer.php'); ?>
+
 
 <style>
   /* Background Gradient */
