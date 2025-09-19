@@ -16,7 +16,8 @@ if (isset($_POST['login'])) {
     $tenant = $stmt->fetch(PDO::FETCH_ASSOC);
     $tenant['password'];
 
-  if ($tenant && $password === $tenant['password']) {
+ if ($tenant && password_verify($password, $tenant['password'])) {
+
 
         $_SESSION['TenantID']   = $tenant['TenantID'];
         $_SESSION['TenantName'] = $tenant['tenant_FN'] . ' ' . $tenant['tenant_LN'];
