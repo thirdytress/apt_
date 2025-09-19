@@ -7,6 +7,8 @@ $error = "";
 if (isset($_POST['login'])) {
     $email = $_POST['email'] ?? '';
     $password = $_POST['password'] ?? '';
+    echo $email;
+    echo $password;
 
     // ✅ Fetch tenant by email
     $stmt = $pdo->prepare("SELECT * FROM tenants WHERE Email = ?");
