@@ -14,6 +14,7 @@ if (isset($_POST['login'])) {
     $stmt = $pdo->prepare("SELECT * FROM tenants WHERE Email = ?");
     $stmt->execute([$email]);
     $tenant = $stmt->fetch(PDO::FETCH_ASSOC);
+    $tenant['password'];
 
   if ($tenant && $password === $tenant['password']) {
 
